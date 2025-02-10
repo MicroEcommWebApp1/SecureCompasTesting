@@ -63,22 +63,52 @@ namespace MicroFocus.InsecureWebApp.Controllers
         }
 
         [HttpPost("UploadFile")]
-        public async Task<bool> UploadFile(IFormFile file, string sPath)
+public async Task<bool> UploadFile(IFormFile file, string sPath)
+{
+    bool blnResult = false;
+    try
+    {
+        string baseDirectory = Path.GetFullPath("AllowedDirectory");
+        string fullPath = Path.GetFullPath(Path.Combine(baseDirectory, sPath));
+
+        if (!fullPath.StartsWith(baseDirectory))
+            throw new UnauthorizedAccessException("Invalid file path.");
+
+        string fileName = Path.GetFileName(sPath);
+        if (!Regex.IsMatch(fileName, @"^[a-zA-Z0-9_.-]+$"))
+            throw new ArgumentException("Invalid file name.");
+
+        string[] allowedExtensions = { ".txt", ".jpg", ".png" };
+        if (!allowedExtensions.Contains(Path.GetExtension(fileName)))
+            throw new ArgumentException("Invalid file extension.");
+
+        if (!Directory.Exists(baseDirectory))
+            throw new DirectoryNotFoundException("Base directory does not exist.");
+
+        using (var stream = new FileStream(fullPath, FileMode.Create))
         {
-            bool blnResult = false;
-            try
-            {
-                using (var stream = new FileStream(sPath, FileMode.Create))
-                {
-                    await file.CopyToAsync(stream);
-                }
-                blnResult = true;
-            }catch (Exception ex)
-            {
-                throw new FileLoadException(ex.Message);
-            }
-            return blnResult;
+            await file.CopyToAsync(stream);
         }
+        blnResult = true;
+    }
+    catch (UnauthorizedAccessException)
+    {
+        // Log unauthorized access attempt
+    }
+    catch (ArgumentException)
+    {
+        // Log invalid argument
+    }
+    catch (DirectoryNotFoundException)
+    {
+        // Log directory not found
+    }
+    catch (FileLoadException)
+    {
+        // Log file load exception
+    }
+    return blnResult;
+}
 
         [HttpPost("UpdateXml")]
         public async Task<bool> UpdateXml(string sFileName, string xmlContent)
